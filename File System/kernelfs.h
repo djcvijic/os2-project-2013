@@ -1,5 +1,6 @@
 #pragma once
 
+#include "part.h"
 #include "fs.h"
 #include "thread.h"
 #include <map>
@@ -47,17 +48,22 @@ struct IndexCluster{
 	}
 }
 
-typedef int ThreadID;
+typedef unsigned long ThreadID;
 
-struct ThreadDescriptor{
+struct StringComparer{
+    bool operator()(const char* x, const char* y)
+    {
+         return strcmp(x,y) < 0;
+    }
+};
+
+struct ThreadInfo{
 	ThreadID myID;
-	map<File*, int> openedMap;
-	map<File*, int> declaredMap;
+	map<char*, char, StringComparer> openedFiles;
+	map<char*, char, StringComparer> declaredFiles;
 
-	ThreadDescriptor(ThreadID id){
+	ThreadInfo(ThreadID id){
 		myID = id;
-		openedMap = new map<File*, int>();
-		declaredMap = new map<File*, int>();
 	}
 }
 
@@ -90,7 +96,7 @@ protected:
 
 	HANDLE fsMutex;
 
-	map<ThreadID, ThreadDescriptor*> threadMap;
+	map<ThreadID, ThreadInfo*> threadMap;
 
-	map<char*, File*> fileMap;
+	map<char*, File*, StringComparer> fileMap;
 };
