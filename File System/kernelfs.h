@@ -3,7 +3,7 @@
 #include "part.h"
 #include "fs.h"
 #include "thread.h"
-#include <map>
+#include "bankers.h"
 
 struct PartitionMapEntry{
 	char name;
@@ -57,16 +57,6 @@ struct StringComparer{
     }
 };
 
-struct ThreadInfo{
-	ThreadID myID;
-	map<char*, char, StringComparer> openedFiles;
-	map<char*, char, StringComparer> declaredFiles;
-
-	ThreadInfo(ThreadID id){
-		myID = id;
-	}
-}
-
 class KernelFS {
 public:
 	~KernelFS();
@@ -90,13 +80,13 @@ public:
 	KernelFS();
 
 protected:
-	File* findFile(char* fname);
+	Entry findFile(char* fname);
 
 	PartitionMapEntry* partitionMap;
 
 	HANDLE fsMutex;
 
-	map<ThreadID, ThreadInfo*> threadMap;
+	map<char*, Entry, StringComparer> openFileMap;
 
-	map<char*, File*, StringComparer> fileMap;
+	BankersTable bankersTable;
 };

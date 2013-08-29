@@ -115,7 +115,7 @@ char KernelFS::readRootDir(char part, EntryNum n, Directory &d){
 	return ENTRYCNT + (tempCluster->rootDirEntries[iSrc].name == 0) ? 0 : 1; // If there are no more entries in the directory, return 64, else return 65.
 }
 
-File* KernelFS::findFile(char* fname){
+Entry KernelFS::findFile(char* fname){
 	int i = fname[0] - 'A';
 	int charDest, charSrc;
 	char relFName[] = "        ";
@@ -145,7 +145,7 @@ File* KernelFS::findFile(char* fname){
 			}
 			if ((0 == strcmp(tempCluster->rootDirEntries[entry].name, relFName)) && // We check the filename...
 				(0 == strcmp(tempCluster->rootDirEntries[entry].ext, relFExt))){ // ... As well as the extension...
-					return new File(tempCluster->rootDirEntries[entry]); // ... And if they are both equal, return 1.
+					return tempCluster->rootDirEntries[entry]; // ... And if they are both equal, return 1.
 			}
 		}
 		if (tempCluster->nextRootCluster == 0){
@@ -156,41 +156,17 @@ File* KernelFS::findFile(char* fname){
 }
 
 char KernelFS::doesExist(char* fname){
-	File* tempFile = findFile(fname);
-	retVal = (tempFile != 0);
-	delete tempFile;
-	return retVal;
+	return (0 != findFile(fname));
 }
 
 char KernelFS::declare(char* fname, int mode){
 	ThreadID tid = GetCurrentThreadId();
-	File* file = findFile(fname);
-
-	if (threadMap.find(tid) == threadMap.end()){ // Then we have to add current thread to the map.
-		wait (fsMutex);
-		if (threadMap.find(tid) == threadMap.end()){
-			threadMap[tid] = new TheadInfo(tid);
-		}
-		signal (fsMutex);
-	}
-
-	if (fileMap.find(fname) == fileMap.end()){ // Then we have to add the file to the map.
-		wait (fsMutex);
-		if (fileMap.find(fname) == fileMap.end()){
-			fileMap[fname] = file;
-		}
-		signal (fsMutex);
-	}
 
 	if (1 == mode){
-		threadMap[tid]->declaredFiles[fname] = 1;
+		return bankersTable.declare(tid, fname);
+	} else {
+		return bankersTable.undeclare(tid, fname);
 	}
-	else{
-		if (1 == threadMap[tid]->openedFiles[fname]) return 0; // File is opened by this thread and cannot be undeclared.
-		threadMap[tid]->declaredFiles[fname] = 0;
-	}
-
-	return 1;
 }
 
 File* KernelFS::open(char* fname){
@@ -206,4 +182,6 @@ KernelFS::KernelFS(){
 	}
 
 	fsMutex = CreateSemaphore(NULL,1,1,NULL);
+
+	bankersTable = BankersTable::getInstance();
 }
