@@ -160,16 +160,31 @@ char KernelFS::doesExist(char* fname){
 }
 
 char KernelFS::declare(char* fname, int mode){
+	char retVal;
 	ThreadID tid = GetCurrentThreadId();
+	wait(fsMutex);
 
 	if (1 == mode){
-		return bankersTable.declare(tid, fname);
+		retVal = bankersTable.declare(tid, fname);
 	} else {
-		return bankersTable.undeclare(tid, fname);
+		retVal = bankersTable.undeclare(tid, fname);
 	}
+
+	signal(fsMutex);
+	return retVal;
 }
 
 File* KernelFS::open(char* fname){
+	ThreadID tid = GetCurrentThreadId();
+	wait(fsMutex);
+
+	while(0 == bankersTable.checkSafeSequence(tid, fname)){
+		signal(fsMutex);
+		wait(bankersTable.openFileMap.find(fname).fileMutex);
+		wait(fsMutex);
+	}
+
+	signal(fsMutex);
 }
 
 char KernelFS::deleteFile(char* fname){

@@ -50,13 +50,6 @@ struct IndexCluster{
 
 typedef unsigned long ThreadID;
 
-struct StringComparer{
-    bool operator()(const char* x, const char* y)
-    {
-         return strcmp(x,y) < 0;
-    }
-};
-
 class KernelFS {
 public:
 	~KernelFS();
@@ -85,8 +78,6 @@ protected:
 	PartitionMapEntry* partitionMap;
 
 	HANDLE fsMutex;
-
-	map<char*, Entry, StringComparer> openFileMap;
 
 	BankersTable bankersTable;
 };
