@@ -43,8 +43,6 @@ class BankersTable {
 public:
 	map<char*, FileInfo, StringComparer> openFileMap;
 
-	vector<ThreadInfo> tableByThread;
-
 	~BankersTable();
 
 	static BankersTable getInstance();
@@ -61,6 +59,8 @@ public:
 
 protected:
 	static BankersTable instance = new BankersTable();
+
+	vector<ThreadInfo> tableByThread;
 
 	char checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBankersTable);
 
