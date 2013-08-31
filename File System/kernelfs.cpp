@@ -175,6 +175,8 @@ char KernelFS::declare(char* fname, int mode){
 }
 
 File* KernelFS::open(char* fname){
+	File* retVal;
+	Entry fileEntry;
 	ThreadID tid = GetCurrentThreadId();
 	wait(fsMutex);
 
@@ -184,7 +186,11 @@ File* KernelFS::open(char* fname){
 		wait(fsMutex);
 	}
 
+	fileEntry = findFile(fname);
+	if (0 == fileEntry) fileEntry = createFile(fname);
+	retVal = new File(fileEntry, bankersTable.openFileMap.find(fname));
 	signal(fsMutex);
+	return retVal;
 }
 
 char KernelFS::deleteFile(char* fname){

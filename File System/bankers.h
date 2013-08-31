@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <map>
 #include "thread.h"
 #include "kernelfs.h"
@@ -14,23 +13,22 @@ struct StringComparer{
 
 struct FileInfo{
 	char* fname;
-	Entry entry;
 	HANDLE fileMutex;
-	ThreadInfo* openedBy;
+	tid openedBy;
 
 	inline bool operator==(const FileInfo& lhs, const FileInfo& rhs){ return (0 == strcmp(lhs.fname, rhs.fname)); }
 
 	FileInfo(char* fname){
 		this->fname = fname;
 		fileMutex = CreateSemaphore(NULL,1,1,NULL);
-		openedBy = 0;
+		openedBy = -1;
 	}
 }
 
 struct ThreadInfo{
 	ThreadID tid;
-	vector<FileInfo> declaredFiles;
-	vector<FileInfo> openedFiles;
+	map<char*, FileInfo, StringComparer> declaredFiles;
+	map<char*, FileInfo, StringComparer> openedFiles;
 
 	inline bool operator==(const ThreadInfo& lhs, const ThreadInfo& rhs){ return (lhs.tid == rhs.tid); }
 
@@ -55,12 +53,12 @@ public:
 
 	char close(ThreadID tid, char* fname);
 
-	char checkSafeSequence(ThreadID tid, char* fname, char mode);
+	char checkSafeSequence(ThreadID tid, char* fname);
 
 protected:
 	static BankersTable instance = new BankersTable();
 
-	vector<ThreadInfo> tableByThread;
+	map<ThreadID, ThreadInfo> tableByThread;
 
 	char checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBankersTable);
 
