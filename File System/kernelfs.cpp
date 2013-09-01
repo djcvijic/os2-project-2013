@@ -115,6 +115,58 @@ char KernelFS::readRootDir(char part, EntryNum n, Directory &d){
 	return ENTRYCNT + (tempCluster->rootDirEntries[iSrc].name == 0) ? 0 : 1; // If there are no more entries in the directory, return 64, else return 65.
 }
 
+char KernelFS::doesExist(char* fname){
+	return (0 != findFile(fname));
+}
+
+char KernelFS::declare(char* fname, int mode){
+	char retVal;
+	ThreadID tid = GetCurrentThreadId();
+	wait(fsMutex);
+
+	if (1 == mode){
+		retVal = bankersTable.declare(tid, fname);
+	} else {
+		retVal = bankersTable.undeclare(tid, fname);
+	}
+
+	signal(fsMutex);
+	return retVal;
+}
+
+File* KernelFS::open(char* fname){
+	File* retVal;
+	Entry fileEntry;
+	ThreadID tid = GetCurrentThreadId();
+	wait(fsMutex);
+
+	while(0 == bankersTable.checkSafeSequence(tid, fname)){
+		signal(fsMutex);
+		wait(bankersTable.openFileMap[fname].fileMutex);
+		wait(fsMutex);
+	}
+
+	fileEntry = findFile(fname);
+	if (0 == fileEntry) fileEntry = createFile(fname);
+	retVal = new File(fileEntry, bankersTable.openFileMap[fname]);
+	signal(fsMutex);
+	return retVal;
+}
+
+char KernelFS::deleteFile(char* fname){
+}
+
+KernelFS::KernelFS(){
+	partitionMap = new PartitionMapEntry[26];
+	for (int i = 0; i < 26; i++){
+		partitionMap[i] = new PartitionMapEntry(i);
+	}
+
+	fsMutex = CreateSemaphore(NULL,1,1,NULL);
+
+	bankersTable = BankersTable::getInstance();
+}
+
 Entry KernelFS::findFile(char* fname){
 	int i = fname[0] - 'A';
 	int charDest, charSrc;
@@ -155,54 +207,67 @@ Entry KernelFS::findFile(char* fname){
 	}
 }
 
-char KernelFS::doesExist(char* fname){
-	return (0 != findFile(fname));
-}
+Entry KernelFS::createFile(char* fname){
+	char part = fname[0];
+	int i = part - 'A';
+	int charDest, charSrc;
+	char relFName[] = "        ";
+	char relFExt[] = "   ";
 
-char KernelFS::declare(char* fname, int mode){
-	char retVal;
-	ThreadID tid = GetCurrentThreadId();
-	wait(fsMutex);
-
-	if (1 == mode){
-		retVal = bankersTable.declare(tid, fname);
-	} else {
-		retVal = bankersTable.undeclare(tid, fname);
+	for (charDest = 0, charSrc = 4; fname[charSrc] != '.'; charDest++, charSrc++){ // Load the relative name of the file without the extension.
+		if (charDest >= FNAMELEN) return 0; // The file name is above the maximum length.
+		relFName[charDest] = fname[charSrc];
+	}
+	charSrc += 1;
+	for (charDest = 0; fname[charSrc] != 0; charDest++, charSrc++){ // Load the extension of the file.
+		if (charDest >= FEXTLEN) return 0; // The file extention is above the maximum length.
+		relFExt[charDest] = fname[charSrc];
 	}
 
-	signal(fsMutex);
-	return retVal;
-}
+	Entry newEntry = Entry { relFName, relFExt, 0, 0, 0 };
+	EntryNum entryNum;
+	ClusterNo clusterNo = 0;
 
-File* KernelFS::open(char* fname){
-	File* retVal;
-	Entry fileEntry;
-	ThreadID tid = GetCurrentThreadId();
-	wait(fsMutex);
+	RootCluster* tempCluster = new RootCluster();
+	if ((partitionMap[i].partition == 0) ||
+		(0 == partitionMap[i].partition->getNumOfClusters))
+		return 0; // If partition is not mounted or size 0, return 0.
 
-	while(0 == bankersTable.checkSafeSequence(tid, fname)){
-		signal(fsMutex);
-		wait(bankersTable.openFileMap.find(fname).fileMutex);
-		wait(fsMutex);
+	partitionMap[i].partition->readCluster(clusterNo, (char*) tempCluster); // Load zero root cluster.
+	while (1){
+		for (entryNum = 0; entryNum < ENTRYCNT; entryNum++){ // Go through all the entries. If we come across an empty one, there are no more entries and we can break.
+			if (tempCluster->rootDirEntries[entryNum].name == 0){
+				break;
+			}
+		}
+		if (tempCluster->nextRootCluster == 0){
+			break; // If there is no next cluster, break...
+		}
+		clusterNo = tempCluster->nextRootCluster;
+		partitionMap[i].partition->readCluster(clusterNo, (char*) tempCluster); // ... And if there is, go to the next one and start over.
 	}
 
-	fileEntry = findFile(fname);
-	if (0 == fileEntry) fileEntry = createFile(fname);
-	retVal = new File(fileEntry, bankersTable.openFileMap.find(fname));
-	signal(fsMutex);
-	return retVal;
-}
+	if (entryNum == ENTRYCNT){
+		RootCluster* zeroRootCluster = new RootCluster();
+		partitionMap[i].partition->readCluster(0, (char*) zeroRootCluster); // Read the zero root cluster.
 
-char KernelFS::deleteFile(char* fname){
-}
+		ClusterNo freeClusterNo = zeroRootCluster->prevRootCluster; // Get the first free cluster number.
+		RootCluster* freeCluster = new RootCluster();
+		partitionMap[i].partition->readCluster(freeClusterNo, (char*) freeCluster); // Read the first free cluster.
 
-KernelFS::KernelFS(){
-	partitionMap = new PartitionMapEntry[26];
-	for (int i = 0; i < 26; i++){
-		partitionMap[i] = new PartitionMapEntry(i);
+		zeroRootCluster->prevRootCluster = (ClusterNo) freeCluster;
+		partitionMap[i].partition->writeCluster(0, (char*) zeroRootCluster); // Modify the zero root cluster to point to next free cluster, and save it.
+
+		tempCluster->nextRootCluster = freeClusterNo;
+		partitionMap[i].partition->writeCluster(clusterNo, (char*) tempCluster); // Modify the temp cluster to point at the new free one, and save it.
+
+		freeCluster->prevRootCluster = clusterNo; // Modify the free cluster to point at the previous one.
+
+		tempCluster = freeCluster;
+		clusterNo = freeClusterNo;
+		entryNum = 0; // And after this, we can call the new free cluster the temp cluster, with the next entry number pointing at the first slot.
 	}
 
-	fsMutex = CreateSemaphore(NULL,1,1,NULL);
-
-	bankersTable = BankersTable::getInstance();
+	tempCluster->rootDirEntries[entryNum] = newEntry;
+	partitionMap[i].partition->writeCluster(clusterNo, (char*) tempCluster); // Add the new entry to the cluster, and save it.
 }

@@ -19,20 +19,23 @@ char BankersTable::declare(ThreadID tid, char* fname){
 		openFileMap.put(fname, FileInfo(fname)); // Add it to the global map.
 	}
 
-	tableByThread.find(tid).declaredFiles.put(fname, FileInfo(fname)); // Add the file.
+	if (tableByThread[tid].declaredFiles.find(fname) == tableByThread[tid].declaredFiles.end()){ // If the file has not already been declared by that thread.
+		tableByThread[tid].declaredFiles.put(fname, FileInfo(fname)); // Add the file.
+	}
+
 	return 1;
 }
 
 char BankersTable::undeclare(ThreadID tid, char* fname){
-	if (openFileMap.find(fname).openedBy == tid) return 0; // File is opened by this thread and cannot be undeclared.
+	if (openFileMap[fname].openedBy == tid) return 0; // File is opened by this thread and cannot be undeclared.
 	
-	tableByThread.find(tid).declaredFiles.erase(fname);
+	tableByThread[tid].declaredFiles.erase(fname);
 
 	return 1;
 }
 
 char BankersTable::open(ThreadID tid, char* fname){
-	FileInfo fileInfo = openFileMap.find(fname);
+	FileInfo fileInfo = openFileMap[fname];
 	int fileN;
 
 	if (fileInfo.openedBy != -1){
@@ -44,21 +47,21 @@ char BankersTable::open(ThreadID tid, char* fname){
 			return 0; // Either the thread was not found (never declared anything), or the file was not found in the threads declared file list.
 	}
 
-	tableByThread.find(tid).openedFiles.put(fname, FileInfo(fname));
-	openFileMap.find(fname).openedBy = tid;
+	tableByThread[tid].openedFiles.put(fname, FileInfo(fname));
+	openFileMap[fname].openedBy = tid;
 	
 	return 1;
 }
 
 char BankersTable::close(ThreadID tid, char* fname){
-	FileInfo fileInfo = openFileMap.find(fname);
+	FileInfo fileInfo = openFileMap[fname];
 
 	if (fileInfo.openedBy == -1){
 		return 0; // If the file is not opened, return 0.
 	}
 
-	tableByThread.find(tid).openedFiles.erase(fname);
-	openFileMap.find(fname)->openedBy = -1;
+	tableByThread[tid].openedFiles.erase(fname);
+	openFileMap[fname]->openedBy = -1;
 	return 1;
 }
 
@@ -85,7 +88,7 @@ char BankersTable::checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBan
 	for( map<char*, FileInfo, StringComparer>::const_iterator it = threadInfo.declaredFiles.begin(); it != threadInfo.declaredFiles.end(); ++it ) // Go through all declared files.
 	{
 		if ((tempBankersTable.openFileMap.find(it->first) != tempBankersTable.openFileMap.end()) && // If this file is already opened...
-			(tempBankersTable.openFileMap.find(it->first).openedBy != threadInfo.tid) && // ... but not by this thread...
+			(tempBankersTable.openFileMap[it->first].openedBy != threadInfo.tid) && // ... but not by this thread...
 			(0 == tempBankersTable.open(threadInfo.tid, it->first))){ // ... and cannot be opened by it...
 				return 0; // ... this sequence is not safe.
 		}

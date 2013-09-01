@@ -22,6 +22,7 @@ struct RootCluster{
 	ClusterNo nextRootCluster;
 	ClusterNo prevRootCluster; // In the case of ClusterZero, this is firstFreeCluster
 	Directory rootDirEntries;
+	char reserved[760];
 
 	RootCluster(){
 	}
@@ -74,6 +75,8 @@ public:
 
 protected:
 	Entry findFile(char* fname);
+
+	Entry createFile(char* fname);
 
 	PartitionMapEntry* partitionMap;
 
