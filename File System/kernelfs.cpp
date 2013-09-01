@@ -1,7 +1,9 @@
 #include "kernelfs.h"
 #include "part.h"
 #include "fs.h"
+#include "kernelfile.h"
 #include <cstring>
+#include <map>
 
 using namespace std;
 
@@ -157,15 +159,39 @@ File* KernelFS::open(char* fname){
 		wait(fsMutex);
 	}
 
+	bankersTable.open(tid, fname);
 	fileLocation = findFile(fname);
 	if (0 == fileLocation) fileLocation = createFile(fname);
 	bankersTable.openFileMap[fname].fileLocation = fileLocation;
-	retVal = new File(bankersTable.openFileMap[fname]);
+	retVal = KernelFile::infoToFile(bankersTable.openFileMap[fname]);
 	signal(fsMutex);
 	return retVal;
 }
 
 char KernelFS::deleteFile(char* fname){
+	ThreadID tid = GetCurrentThreadId();
+	File* deletingFile;
+	wait(fsMutex);
+	deletingFile = KernelFile::infoToFile(bankersTable.openFileMap[fname]);
+	bankersTable.undeclare(tid, fname);
+
+	if ((bankersTable.openFileMap.find(fname) != bankersTable.openFileMap.end()) &&
+		(bankersTable.openFilemap[fname].openedBy != -1)){ // File is still open and cannot be deleted.
+			signal(fsMutex);
+			return 0;
+	}
+
+	for( map<ThreadID,ThreadInfo>::const_iterator it = bankersTable.tableByThread.begin(); it != bankersTable.tableByThread.end(); ++it ) // Search all threads.
+	{
+		if (it->second.declaredFiles.find(fname) != it->second.declaredFiles.end()) { // File is still declared by some other threads.
+			signal(fsMutex);
+			return 0;
+		}
+	}
+
+	// Getting here means file is not open, and is not declared by any threads.
+
+	
 }
 
 KernelFS::KernelFS(){
@@ -271,11 +297,11 @@ FileLocation KernelFS::createFile(char* fname){
 
 	RootCluster* zeroRootCluster, freeCluster;
 	zeroRootCluster = new RootCluster();
+	freeCluster = new RootCluster();
 	partitionMap[i].partition->readCluster(0, (char*) zeroRootCluster); // Read the zero root cluster.
 
 	if (entryNum == ENTRYCNT){
 		ClusterNo freeClusterNo = zeroRootCluster->prevRootCluster; // Get the first free cluster number.
-		freeCluster = new RootCluster();
 		partitionMap[i].partition->readCluster(freeClusterNo, (char*) freeCluster); // Read the first free cluster.
 
 		zeroRootCluster->prevRootCluster = (ClusterNo) (*freeCluster);
@@ -283,9 +309,8 @@ FileLocation KernelFS::createFile(char* fname){
 		tempCluster->nextRootCluster = freeClusterNo;
 		partitionMap[i].partition->writeCluster(clusterNo, (char*) tempCluster); // Modify the temp cluster to point at the new free one, and save it.
 
-		freeCluster->prevRootCluster = clusterNo; // Modify the free cluster to point at the previous one.
-
-		*tempCluster = *freeCluster;
+		delete tempCluster;
+		tempCluster = new RootCluster(0, clusterNo); // Clean and format the new cluster, and point "prevRootCluster" to the previous one.
 		clusterNo = freeClusterNo;
 		entryNum = 0; // And after this, we can call the new free cluster the temp cluster, with the next entry number pointing at the first slot.
 	}

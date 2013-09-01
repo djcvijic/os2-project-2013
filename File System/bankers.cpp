@@ -1,5 +1,8 @@
 #include "bankers.h"
+#include <cstring>
 #include <iostream>
+
+using namespace std;
 
 BankersTable::~BankersTable(){
 }
@@ -12,15 +15,15 @@ char BankersTable::declare(ThreadID tid, char* fname){
 	int threadN, fileN;
 
 	if (tableByThread.find(tid) == tableByThread.end()){ // If the thread doesn't exist, then we have to add it.
-		tableByThread.put(tid, ThreadInfo(tid));
+		tableByThread[tid] = ThreadInfo(tid);
 	}
 
 	if (openFileMap.find(fname) == openFileMap.end()){ // If the file has never been declared before
-		openFileMap.put(fname, FileInfo(fname)); // Add it to the global map.
+		openFileMap[fname] = FileInfo(fname); // Add it to the global map.
 	}
 
 	if (tableByThread[tid].declaredFiles.find(fname) == tableByThread[tid].declaredFiles.end()){ // If the file has not already been declared by that thread.
-		tableByThread[tid].declaredFiles.put(fname, FileInfo(fname)); // Add the file.
+		tableByThread[tid].declaredFiles[fname] = FileInfo(fname); // Add the file.
 	}
 
 	return 1;
@@ -47,7 +50,7 @@ char BankersTable::open(ThreadID tid, char* fname){
 			return 0; // Either the thread was not found (never declared anything), or the file was not found in the threads declared file list.
 	}
 
-	tableByThread[tid].openedFiles.put(fname, FileInfo(fname));
+	tableByThread[tid].openedFiles[fname] = FileInfo(fname);
 	openFileMap[fname].openedBy = tid;
 	
 	return 1;
