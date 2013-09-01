@@ -136,7 +136,7 @@ char KernelFS::declare(char* fname, int mode){
 
 File* KernelFS::open(char* fname){
 	File* retVal;
-	Entry fileEntry;
+	FileLocation fileLocation;
 	ThreadID tid = GetCurrentThreadId();
 	wait(fsMutex);
 
@@ -146,9 +146,9 @@ File* KernelFS::open(char* fname){
 		wait(fsMutex);
 	}
 
-	fileEntry = findFile(fname);
-	if (0 == fileEntry) fileEntry = createFile(fname);
-	retVal = new File(fileEntry, bankersTable.openFileMap[fname]);
+	fileLocation = findFile(fname);
+	if (0 == fileEntry) fileLocation = createFile(fname);
+	retVal = new File(fileLocation, bankersTable.openFileMap[fname]);
 	signal(fsMutex);
 	return retVal;
 }
@@ -167,7 +167,7 @@ KernelFS::KernelFS(){
 	bankersTable = BankersTable::getInstance();
 }
 
-Entry KernelFS::findFile(char* fname){
+FileLocation KernelFS::findFile(char* fname){
 	int i = fname[0] - 'A';
 	int charDest, charSrc;
 	char relFName[] = "        ";
@@ -184,30 +184,33 @@ Entry KernelFS::findFile(char* fname){
 	}
 
 	RootCluster* tempCluster = new RootCluster();
+	ClusterNo clusterNo = 0;
 	if ((partitionMap[i].partition == 0) ||
 		(0 == partitionMap[i].partition->getNumOfClusters))
 		return 0; // If partition is not mounted or size 0, return 0.
 
-	partitionMap[i].partition->readCluster(0, (char*) tempCluster); // Load zero root cluster.
+	partitionMap[i].partition->readCluster(clusterNo, (char*) tempCluster); // Load zero root cluster.
 	while (1){	
 		EntryNum entry = 0;
 		for (; entry < ENTRYCNT; entry++){ // Go through all the entries. If we come across an empty one, there are no more entries and we can return 0.
-			if (tempCluster->rootDirEntries[entry].name == 0){
+			Entry tempEntry = tempCluster->rootDirEntries[entry];
+			if (tempEntry.name == 0){
 				return 0;
 			}
-			if ((0 == strcmp(tempCluster->rootDirEntries[entry].name, relFName)) && // We check the filename...
-				(0 == strcmp(tempCluster->rootDirEntries[entry].ext, relFExt))){ // ... As well as the extension...
-					return tempCluster->rootDirEntries[entry]; // ... And if they are both equal, return 1.
+			if ((0 == strcmp(tempEntry.name, relFName)) && // We check the filename...
+				(0 == strcmp(tempEntry.ext, relFExt))){ // ... As well as the extension...
+					return FileLocation { tempEntry, clusterNo, entry }; // ... And if they are both equal, return 1.
 			}
 		}
 		if (tempCluster->nextRootCluster == 0){
 			return 0; // If there is no next cluster, return 0...
 		}
-		partitionMap[i].partition->readCluster(tempCluster->nextRootCluster, (char*) tempCluster); // ... And if there is, go to the next one and start over.
+		clusterNo = tempCluster->nextRootCluster;
+		partitionMap[i].partition->readCluster(clusterNo, (char*) tempCluster); // ... And if there is, go to the next one and start over.
 	}
 }
 
-Entry KernelFS::createFile(char* fname){
+FileLocation KernelFS::createFile(char* fname){
 	char part = fname[0];
 	int i = part - 'A';
 	int charDest, charSrc;
@@ -270,4 +273,5 @@ Entry KernelFS::createFile(char* fname){
 
 	tempCluster->rootDirEntries[entryNum] = newEntry;
 	partitionMap[i].partition->writeCluster(clusterNo, (char*) tempCluster); // Add the new entry to the cluster, and save it.
+	return FileLocation { newEntry, clusterNo, entryNum };
 }

@@ -49,6 +49,12 @@ struct IndexCluster{
 	}
 }
 
+struct FileLocation{
+	Entry entry;
+	ClusterNo clusterNo;
+	EntryNum entryNum;
+}
+
 typedef unsigned long ThreadID;
 
 class KernelFS {
@@ -74,9 +80,9 @@ public:
 	KernelFS();
 
 protected:
-	Entry findFile(char* fname);
+	FileLocation findFile(char* fname);
 
-	Entry createFile(char* fname);
+	FileLocation createFile(char* fname);
 
 	PartitionMapEntry* partitionMap;
 
