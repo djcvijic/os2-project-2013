@@ -158,8 +158,9 @@ File* KernelFS::open(char* fname){
 	}
 
 	fileLocation = findFile(fname);
-	if (0 == fileEntry) fileLocation = createFile(fname);
-	retVal = new File(fileLocation, bankersTable.openFileMap[fname]);
+	if (0 == fileLocation) fileLocation = createFile(fname);
+	bankersTable.openFileMap[fname].fileLocation = fileLocation;
+	retVal = new File(bankersTable.openFileMap[fname]);
 	signal(fsMutex);
 	return retVal;
 }

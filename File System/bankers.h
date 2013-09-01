@@ -15,6 +15,7 @@ struct FileInfo{
 	char* fname;
 	HANDLE fileMutex;
 	tid openedBy;
+	FileLocation fileLocation;
 
 	inline bool operator==(const FileInfo& lhs, const FileInfo& rhs){ return (0 == strcmp(lhs.fname, rhs.fname)); }
 
