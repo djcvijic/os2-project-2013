@@ -170,9 +170,10 @@ File* KernelFS::open(char* fname){
 
 char KernelFS::deleteFile(char* fname){
 	ThreadID tid = GetCurrentThreadId();
+	int i = fname[0] - 'A';
 	File* deletingFile;
+
 	wait(fsMutex);
-	deletingFile = KernelFile::infoToFile(bankersTable.openFileMap[fname]);
 	bankersTable.undeclare(tid, fname);
 
 	if ((bankersTable.openFileMap.find(fname) != bankersTable.openFileMap.end()) &&
@@ -190,8 +191,93 @@ char KernelFS::deleteFile(char* fname){
 	}
 
 	// Getting here means file is not open, and is not declared by any threads.
+	// Now for actually deleting all index and data clusters...
 
-	
+	FileLocation fileLocation = bankersTable.openFileMap[fname].fileLocation;
+	ClusterNo indexClusterNo = fileLocation.entry.firstIndexCluster; // Setting the index cluster number to the first index cluster number.
+	ClusterNo dataClusterNo;
+	ClusterNo freeClusterNo;
+	IndexCluster* indexCluster = new IndexCluster();
+	RootCluster* rootCluster = new RootCluster();
+
+	partitionMap[i].partition->readCluster(0, (char*) rootCluster); // Reading the zero root cluster.
+	freeClusterNo = rootCluster->prevRootCluster; // Saving the first free cluster number.
+	rootCluster->prevRootCluster = indexClusterNo;
+	partitionMap[i].partition->writeCluster(0, (char*) rootCluster); // Chaining the head of free clusters to the file's first index cluster.
+
+	while(1){
+		partitionMap[i].partition->readCluster(indexClusterNo, (char*) indexCluster);
+
+		if (0 == indexCluster->fileIndex[0]){ // If this index had no data, treat the index as its own last data cluster.
+			dataClusterNo = indexClusterNo;
+		} else {
+			partitionMap[i].partition->writeCluster(indexClusterNo, (char*) indexCluster->fileIndex[0]); // Chaining the index cluster to its first data cluster.
+
+			for (EntryNum e = 0; e < INDEXCNT; e += 1){ // Go through all file indices in that index cluster and chain them together. At the end, dataClusterNo will point to the last used data cluster.
+				if (indexCluster->fileIndex[e] == 0) break;
+				dataClusterNo = indexCluster->fileIndex[e];
+				if (indexCluster->fileIndex[e + 1] != 0){
+					partitionMap[i].partition->writeCluster(dataClusterNo, (char*) indexCluster->fileIndex[e + 1]);
+				}
+			}
+		}
+
+		indexClusterNo = indexCluster->nextIndexCluster;
+		if (0 == indexClusterNo) break; // Go to the next index cluster, and if it doesn't exist, go to final step.
+		partitionMap[i].partition->writeCluster(dataClusterNo, (char*) indexClusterNo); // Otherwise chain the last data cluster to the next index cluster.
+	}
+
+	partitionMap[i].partition->writeCluster(dataClusterNo, (char*) freeClusterNo); // Last step: anything we last found used, be it a data or index cluster, gets chained with all the old free clusters.
+
+	// At this point all of the file's index and data clusters have been cleared and rechained.
+	// Now we must remove its entry from the directory, and clean up the directory.
+
+	EntryNum e = fileLocation.entryNum;
+	ClusterNo rootClusterNo = fileLocation.clusterNo;
+	partitionMap[i].partition->readCluster(rootClusterNo, (char*) rootCluster);
+	rootCluster->rootDirEntries[e] = 0; // This kills the crab.
+
+	while (1){ // Loop will break the first time we copy a zero into entry "e".
+		if (e < ENTRYNUM - 1){ // Normal case (e < 63), just copy the successive entry into it.
+			rootCluster->rootDirEntries[e] = rootCluster->rootDirEntries[e + 1];
+			if (0 == rootCluster->rootDirEntries[e]) break;
+			e += 1;
+		} else { // This is where e == 63. The next element, if it exists, is in the next root cluster.
+			if (0 == rootCluster->nextRootCluster){ // If there is no next cluster, entry "e" becomes empty.
+				rootCluster->rootDirEntries[e] = 0;
+				break;
+			} else { // If there is a next cluster...
+				RootCluster* tempRootCluster = new RootCluster();
+				partitionMap[i].partition->readCluster(rootCluster->nextRootCluster, (char*) tempRootCluster); // ... we load it into a temporary pointer...
+				rootCluster->rootDirEntries[e] = tempRootCluster->rootDirEntries[0]; // ... copy its zero entry into "e"...
+				e = 0; // ... reset "e" to zero...
+				partitionMap[i].partition->writeCluster(rootClusterNo, (char*) rootCluster); // ... save the old cluster...
+				rootClusterNo = tempRootCluster->nextRootCluster; // ... update the root cluster number...
+				delete rootCluster;
+				rootCluster = tempRootCluster; // ... and replace the old cluster with the new one.
+			}
+		}
+	}
+
+	if ((0 != e) || (0 == rootClusterNo)){ // Normal situation: we ended up somewhere in the middle of the last root cluster. Also, ignore for zero root cluster.
+		partitionMap[i].partition->writeCluster(rootClusterNo, (char*) rootCluster);
+	} else { // This means we just emptied the last root cluster and must delete it.
+		RootCluster* tempRootCluster = new RootCluster();
+		partitionMap[i].partition->readCluster(rootCluster->prevRootCluster, (char*) tempRootCluster); // Load the previous root cluster.
+		prevRootCluster->nextRootCluster = 0;
+		partitionMap[i].partition->writeCluster(rootCluster->prevRootCluster, (char*) tempRootCluster); // This sets the previous root cluster's "next" pointer to zero.
+
+		partitionMap[i].partition->readCluster(0, (char*) tempRootCluster); // Reading the zero root cluster.
+		partitionMap[i].partition->writeCluster(rootClusterNo, (char*) tempRootCluster->prevRootCluster); // Chain the newly empty cluster to the list of free clusters.
+		tempRootCluster->prevRootCluster = rootClusterNo; // Chain the zero root cluster to the newly empty one.
+		partitionMap[i].partition->writeCluster(0, (char*) tempRootCluster); // Save the zero root cluster.
+		delete tempRootCluster;
+	}
+
+	delete rootCluster;
+	delete indexCluster;
+	signal(fsMutex);
+	return 1;
 }
 
 KernelFS::KernelFS(){
@@ -296,8 +382,10 @@ FileLocation KernelFS::createFile(char* fname){
 	}
 
 	RootCluster* zeroRootCluster, freeCluster;
+	IndexCluster* newIndexCluster;
 	zeroRootCluster = new RootCluster();
 	freeCluster = new RootCluster();
+	newIndexCluster = new IndexCluster();
 	partitionMap[i].partition->readCluster(0, (char*) zeroRootCluster); // Read the zero root cluster.
 
 	if (entryNum == ENTRYCNT){
@@ -318,6 +406,7 @@ FileLocation KernelFS::createFile(char* fname){
 	// Now we'll point the new entry to the first free cluster, and point the zero root cluster to the next free one.
 	newEntry.firstIndexCluster = zeroRootCluster->prevRootCluster;
 	partitionMap[i].partition->readCluster(newEntry.firstIndexCluster, (char*) freeCluster);
+	partitionMap[i].partition->writeCluster(newEntry.firstIndexCluster, (char*) newIndexCluster);
 
 	zeroRootCluster->prevRootCluster = (ClusterNo) (*freeCluster);
 	partitionMap[i].partition->writeCluster(0, (char*) zeroRootCluster);
@@ -328,6 +417,7 @@ FileLocation KernelFS::createFile(char* fname){
 	delete tempCluster;
 	delete zeroRootCluster;
 	delete freeCluster;
+	delete newIndexCluster;
 
 	return FileLocation { newEntry, clusterNo, entryNum };
 }
