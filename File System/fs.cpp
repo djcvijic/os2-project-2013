@@ -2,6 +2,8 @@
 #include "kernelfs.h"
 #include "part.h"
 
+using namespace std;
+
 FS::~FS(){
 }
 

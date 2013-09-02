@@ -23,7 +23,6 @@ class File;
 
 class FS {
 public:
-
 	~FS ();
 
 	static char mount(Partition* partition); //montira particiju
@@ -55,5 +54,6 @@ public:
 
 protected:
 	FS ();
+
 	static KernelFS *myImpl;
 };

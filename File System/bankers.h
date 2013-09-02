@@ -44,7 +44,7 @@ public:
 
 	~BankersTable();
 
-	static BankersTable getInstance();
+	static BankersTable& getInstance();
 
 	char declare(ThreadID tid, char* fname);
 

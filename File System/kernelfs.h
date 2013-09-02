@@ -82,7 +82,7 @@ public:
 protected:
 	FileLocation findFile(char* fname);
 
-	FileLocation createFile(char* fname);
+	Entry createFile(char* fname);
 
 	PartitionMapEntry* partitionMap;
 

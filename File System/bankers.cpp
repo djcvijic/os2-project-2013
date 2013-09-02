@@ -7,7 +7,7 @@ using namespace std;
 BankersTable::~BankersTable(){
 }
 
-static BankersTable::BankersTable getInstance(){
+static BankersTable& BankersTable::getInstance(){
 	return instance;
 }
 
@@ -101,6 +101,7 @@ char BankersTable::checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBan
 	// Getting here means the sequence is safe so far, and we can go deeper.
 
 	for( map<char*, FileInfo, StringComparer>::const_iterator it = threadInfo.openedFiles.begin(); it != threadInfo.openedFiles.end(); ++it ) // Go through all files opened by this thread and close them.
+	{
 		tempBankersTable.close(threadInfo.tid, it->first);
 	}
 
