@@ -149,7 +149,7 @@ char KernelFS::declare(char* fname, int mode){
 
 File* KernelFS::open(char* fname){
 	File* retVal;
-	FileLocation fileLocation;
+	Entry fileEntry;
 	ThreadID tid = GetCurrentThreadId();
 	wait(fsMutex);
 
@@ -160,9 +160,9 @@ File* KernelFS::open(char* fname){
 	}
 
 	bankersTable.open(tid, fname);
-	fileLocation = findFile(fname);
-	if (0 == fileLocation) fileLocation = createFile(fname);
-	bankersTable.openFileMap[fname].fileLocation = fileLocation;
+	fileEntry = findFile(fname).entry;
+	if (0 == fileEntry) fileEntry = createFile(fname);
+	bankersTable.openFileMap[fname].entry = fileEntry;
 	retVal = KernelFile::infoToFile(bankersTable.openFileMap[fname]);
 	signal(fsMutex);
 	return retVal;
@@ -193,7 +193,7 @@ char KernelFS::deleteFile(char* fname){
 	// Getting here means file is not open, and is not declared by any threads.
 	// Now for actually deleting all index and data clusters...
 
-	FileLocation fileLocation = bankersTable.openFileMap[fname].fileLocation;
+	FileLocation fileLocation = findFile(fname);
 	ClusterNo indexClusterNo = fileLocation.entry.firstIndexCluster; // Setting the index cluster number to the first index cluster number.
 	ClusterNo dataClusterNo;
 	ClusterNo freeClusterNo;
@@ -339,7 +339,7 @@ FileLocation KernelFS::findFile(char* fname){
 	}
 }
 
-FileLocation KernelFS::createFile(char* fname){
+Entry KernelFS::createFile(char* fname){
 	char part = fname[0];
 	int i = part - 'A';
 	int charDest, charSrc;
@@ -419,5 +419,5 @@ FileLocation KernelFS::createFile(char* fname){
 	delete freeCluster;
 	delete newIndexCluster;
 
-	return FileLocation { newEntry, clusterNo, entryNum };
+	return newEntry;
 }
