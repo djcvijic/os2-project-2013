@@ -1,8 +1,10 @@
-#include "kernelfile.h"
-
 #pragma once
 
+#include "kernelfile.h"
+#include "part.h"
+
 char KernelFile::write (BytesCnt bytesCnt, char* buffer){
+
 	return 0;
 }
 

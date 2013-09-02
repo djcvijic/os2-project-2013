@@ -1,42 +1,12 @@
 #pragma once
 
+#include "types.h"
 #include <map>
 #include "thread.h"
 #include "kernelfs.h"
+#include "fs.h"
 
-struct StringComparer{
-    bool operator()(const char* x, const char* y)
-    {
-         return strcmp(x,y) < 0;
-    }
-};
-
-struct FileInfo{
-	char* fname;
-	HANDLE fileMutex;
-	tid openedBy;
-	Entry entry;
-
-	inline bool operator==(const FileInfo& lhs, const FileInfo& rhs){ return (0 == strcmp(lhs.fname, rhs.fname)); }
-
-	FileInfo(char* fname){
-		this->fname = fname;
-		fileMutex = CreateSemaphore(NULL,1,1,NULL);
-		openedBy = -1;
-	}
-}
-
-struct ThreadInfo{
-	ThreadID tid;
-	map<char*, FileInfo, StringComparer> declaredFiles;
-	map<char*, FileInfo, StringComparer> openedFiles;
-
-	inline bool operator==(const ThreadInfo& lhs, const ThreadInfo& rhs){ return (lhs.tid == rhs.tid); }
-
-	ThreadInfo(tid){
-		this.tid = tid;
-	}
-}
+using namespace std;
 
 class BankersTable {
 public:
@@ -57,11 +27,11 @@ public:
 	char checkSafeSequence(ThreadID tid, char* fname);
 
 protected:
-	static BankersTable instance = new BankersTable();
+	BankersTable();
+
+	static BankersTable instance;
 
 	map<ThreadID, ThreadInfo> tableByThread;
 
 	char checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBankersTable);
-
-	BankersTable();
 };

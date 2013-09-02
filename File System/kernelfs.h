@@ -1,61 +1,10 @@
 #pragma once
 
+#include "types.h"
 #include "part.h"
 #include "fs.h"
 #include "thread.h"
 #include "bankers.h"
-
-struct PartitionMapEntry{
-	char name;
-	Partition* partition;
-	bool accessible;
-	HANDLE idle;
-	PartitionMapEntry(int partitionNumber){
-		name = 'A' + partitionNumber
-		partition = 0;
-		accessible = false;
-		idle = CreateSemaphore(NULL,1,1,NULL);
-	}
-}
-
-struct RootCluster{
-	ClusterNo nextRootCluster;
-	ClusterNo prevRootCluster; // In the case of ClusterZero, this is firstFreeCluster
-	Directory rootDirEntries;
-	char reserved[760];
-
-	RootCluster(){
-	}
-
-	RootCluster(ClusterNo next, ClusterNo prev){
-		nextRootCluster = next;
-		prevRootCluster = prev;
-		for (EntryNum i = 0; i < ENTRYCNT; i++)
-			rootDirEntries[i].name = 0;
-	}
-}
-
-const unsigned long INDEXCNT = 511;
-typedef ClusterNo FileIndex[INDEXCNT];
-
-struct IndexCluster{
-	ClusterNo nextIndexCluster;
-	FileIndex fileIndex;
-
-	IndexCluster(ClusterNo next = 0){
-		nextIndexCluster = next;
-		for (EntryNum i = 0; i < INDEXCNT; i++)
-			fileIndex[i] = 0;
-	}
-}
-
-struct FileLocation{
-	Entry entry;
-	ClusterNo clusterNo;
-	EntryNum entryNum;
-}
-
-typedef unsigned long ThreadID;
 
 class KernelFS {
 public:

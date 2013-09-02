@@ -125,3 +125,5 @@ char BankersTable::checkSafeSequence(ThreadInfo threadInfo, BankersTable tempBan
 
 BankersTable::BankersTable(){
 }
+
+BankersTable::instance = BankersTable();

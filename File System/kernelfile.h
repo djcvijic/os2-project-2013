@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.h"
 #include "kernelfs.h"
 #include "fs.h"
 #include "bankers.h"

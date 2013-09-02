@@ -41,5 +41,3 @@ char FS::deleteFile(char* fname){
 
 FS::FS(){
 }
-
-FS::myImpl = new KernelFS();

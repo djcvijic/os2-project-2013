@@ -1,21 +1,6 @@
 #pragma once
 
-typedef unsigned long BytesCnt; 
-typedef unsigned long EntryNum;
-
-const unsigned long ENTRYCNT=64; 
-const unsigned int FNAMELEN=8;
-const unsigned int FEXTLEN=3;
-
-struct Entry {
-	char name[FNAMELEN];
-	char ext[FEXTLEN];
-	char reserved;
-	unsigned long firstIndexCluster; 
-	unsigned long size;
-};
-
-typedef Entry Directory[ENTRYCNT];
+#include "types.h"
 
 class KernelFS;
 class Partition;
@@ -55,5 +40,5 @@ public:
 protected:
 	FS ();
 
-	static KernelFS *myImpl;
+	static const KernelFS *myImpl = new KernelFS();
 };

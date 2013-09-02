@@ -41,6 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\Administrator\Desktop\OS2 PROJEKAT\File System\File System\javniTest\particija-VS2008&quot;;&quot;C:\Documents and Settings\Administrator\Desktop\OS2 PROJEKAT\File System\File System\javniTest\javniTest&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -171,7 +172,19 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\bankers.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\file.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\fs.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\kernelfile.cpp"
 				>
 			</File>
 			<File
@@ -185,7 +198,19 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\bankers.h"
+				>
+			</File>
+			<File
+				RelativePath=".\file.h"
+				>
+			</File>
+			<File
 				RelativePath=".\fs.h"
+				>
+			</File>
+			<File
+				RelativePath=".\kernelfile.h"
 				>
 			</File>
 			<File
@@ -194,6 +219,10 @@
 			</File>
 			<File
 				RelativePath=".\thread.h"
+				>
+			</File>
+			<File
+				RelativePath=".\types.h"
 				>
 			</File>
 		</Filter>
