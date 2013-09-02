@@ -31,11 +31,18 @@ char KernelFile::truncate (){
 }
 
 KernelFile::~KernelFile(){
+	BankersTable::getInstance().close(fileInfo.openedBy, fileInfo.fname);
+	signal(fileInfo.fileMutex);
 }
 
-static File* KernelFile::infoToFile(FileInfo fileInfo){
-	return 0;
+static File* KernelFile::infoToFile(FileInfo& fileInfo){
+	File* newFile = new File();
+	KernelFile* newKernelFile = new KernelFile(fileInfo);
+	newFile->myImpl = newKernelFile;
+	return newFile;
 }
 
-KernelFile::KernelFile (){
+KernelFile::KernelFile (FileInfo& fileInfo){
+	this->fileInfo = fileInfo;
+	cursor = 0;
 }

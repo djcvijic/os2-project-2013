@@ -28,6 +28,8 @@ private:
 
 	friend class KernelFS;
 
+	friend class KernelFile;
+
 	File ();  //objekat fajla se može kreirati samo otvaranjem
 
 	KernelFile *myImpl;

@@ -35,5 +35,4 @@ File::~File(){
 }
 
 File::File (){
-	myImpl = new KernelFile();
 }

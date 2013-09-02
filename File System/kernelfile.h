@@ -2,6 +2,7 @@
 
 #include "kernelfs.h"
 #include "fs.h"
+#include "bankers.h"
 #include "file.h"
 
 class KernelFile {
@@ -22,12 +23,12 @@ public:
 
 	~KernelFile();
 
-	static File* infoToFile(FileInfo);
+	static File* infoToFile(FileInfo&);
 
 private:
-	FileInfo* fileInfo;
+	FileInfo& fileInfo;
 
 	BytesCnt cursor;
 
-	KernelFile ();
+	KernelFile (FileInfo&);
 };
